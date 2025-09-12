@@ -1,0 +1,6 @@
+streamlit
+Pillow
+requests
+numpy
+tensorflow>=2.13.0
+gdown
