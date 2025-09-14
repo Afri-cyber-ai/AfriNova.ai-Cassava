@@ -88,7 +88,7 @@ st.markdown("""
 # -------------------------------
 
 MODEL_PATH = "cassava_model.keras"
-FILE_ID = "1BhoZx--RL8A6fgLbLG6uxOf7WR_VOjVq"  # Updated Google Drive file ID
+FILE_ID = "1BhoZx--RL8A6fgLbLG6uxOf7WR_VOjVq"  # ✅ Updated Google Drive file ID
 
 @st.cache_resource
 def load_model():
