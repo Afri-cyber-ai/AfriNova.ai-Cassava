@@ -46,6 +46,23 @@ st.markdown("""
             background-color: #8a2be2;
             color: white;
         }
+        .consult-button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin: 2rem auto;
+            display: block;
+            width: 80%;
+            text-align: center;
+        }
+        .consult-button:hover {
+            background-color: #218838;
+            color: white;
+        }
         .prediction-card {
             background-color: #f8f5ff;
             padding: 1.5rem;
@@ -122,14 +139,23 @@ st.markdown("""
         .disease-name {
             font-size: 1.5rem;
             font-weight: bold;
-            color: #6a0dad;
             margin-bottom: 5px;
         }
+        .disease-name-red {
+            color: #dc3545; /* Red for diseases */
+        }
+        .disease-name-green {
+            color: #28a745; /* Green for healthy */
+        }
         .causative-agent {
-            font-size: 1rem;
-            color: #666;
+            font-size: 1.1rem;
+            color: #6a0dad;
             margin-bottom: 15px;
-            font-style: italic;
+            font-weight: 600;
+            background-color: #f0e6ff;
+            padding: 8px 12px;
+            border-radius: 5px;
+            border-left: 4px solid #6a0dad;
         }
         .confidence {
             font-size: 1.2rem;
@@ -394,8 +420,13 @@ else:
             # Get disease data
             disease_data = disease_info[pred["class"]]
             
-            # Display disease name and causative agent
-            st.markdown(f'<div class="disease-name">{pred["class"]}</div>', unsafe_allow_html=True)
+            # Display disease name with color coding
+            if pred["class"] == "Healthy":
+                st.markdown(f'<div class="disease-name disease-name-green">{pred["class"]}</div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="disease-name disease-name-red">{pred["class"]}</div>', unsafe_allow_html=True)
+            
+            # Display causative agent with enhanced visibility
             st.markdown(f'<div class="causative-agent">Causative Agent: {disease_data["causative_agent"]}</div>', unsafe_allow_html=True)
             
             # Display confidence
@@ -415,6 +446,18 @@ else:
             
         else:
             st.info("👈 Upload an image and click 'Analyze' to get results")
+    
+    # Add "Consult an Expert" button below the two columns
+    if uploaded_file and "prediction" in st.session_state:
+        st.markdown("---")
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.markdown(
+                f'<a href="tel:+2348136626696" style="text-decoration: none;">'
+                f'<button class="consult-button">📞 Speak to an Expert: +2348136626696</button>'
+                f'</a>',
+                unsafe_allow_html=True
+            )
             
     # Add some information about the system
     st.markdown("---")
