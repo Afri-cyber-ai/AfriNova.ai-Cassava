@@ -3,12 +3,11 @@ from PIL import Image
 import base64
 import time
 import random
-import io
 
 # Page config
 st.set_page_config(page_title="Cassava Disease Predictor", layout="centered")
 
-# Custom CSS
+# Custom CSS for permanent layout with better image containment
 st.markdown("""
     <style>
         .main {
@@ -30,7 +29,7 @@ st.markdown("""
             padding: 20px;
             border-radius: 10px;
             margin-top: 20px;
-            min-height: 300px;
+            min-height: 350px;
             overflow: hidden;
         }
         .upload-container {
@@ -63,19 +62,19 @@ st.markdown("""
             font-size: 1.5rem;
             font-weight: bold;
             color: #6a0dad;
+            margin-bottom: 5px;
+        }
+        .causative {
+            font-size: 1rem;
+            font-style: italic;
+            color: #444;
             margin-bottom: 10px;
         }
         .confidence {
             font-size: 1.2rem;
             font-weight: bold;
-            margin-bottom: 10px;
-            color: #2c662d;
-        }
-        .causative-agent {
-            font-size: 1rem;
-            font-style: italic;
             margin-bottom: 15px;
-            color: #444;
+            color: #2c662d;
         }
         .custom-header {
             color: #6a0dad;
@@ -83,96 +82,141 @@ st.markdown("""
             padding-bottom: 10px;
             margin-bottom: 15px;
         }
+        .analyzing {
+            text-align: center;
+            font-size: 1.1rem;
+            color: #6a0dad;
+            margin-bottom: 10px;
+        }
     </style>
 """, unsafe_allow_html=True)
 
-# Disease information dictionary
+# Disease info dictionary
 disease_info = {
-    "Cassava Bacterial Blight (CBB)": {
-        "agent": "Xanthomonas spp.",
-        "about": """Water-soaked, angular leaf lesions that later turn brown/black and may merge into large blighted areas.
-        Rapid wilting of shoots and young plants (especially after rain). Stem cankers, oozing of bacterial exudate, stunted growth and dieback.
-        **Prevention:** Use clean cuttings, destroy infected plants, disinfect tools, avoid waterlogged soils, plant resistant varieties."""
-    },
-    "Cassava Brown Streak Disease (CBSD)": {
-        "agent": "Virus (transmitted by Bemisia tabaci whiteflies)",
-        "about": """Yellowing or chlorotic patches on leaves, brown streaks on stems, and necrotic corky rot in storage roots (major yield loss).
-        **Prevention:** Use certified clean cuttings, remove infected plants, control whiteflies, plant tolerant varieties."""
-    },
-    "Cassava Green Mottle (CGM)": {
-        "agent": "Cassava green mottle virus",
-        "about": """Young leaves show yellow or pale green mottling, irregular chlorotic patches, and leaf distortion/stunting.
-        Plants grow slowly with poor-quality roots. **Prevention:** Use virus-free cuttings, rogue infected plants, practice sanitation and crop rotation."""
-    },
-    "Cassava Mosaic Disease (CMD)": {
+    "Cassava Mosaic Disease": {
         "agent": "Cassava Mosaic Geminiviruses (CMGs)",
-        "about": """Irregular yellow-green mosaics on leaves, distortion, stunted growth, and heavy yield loss if severe.
-        **Prevention:** Start with virus-free cuttings, plant resistant varieties, manage whiteflies, and destroy heavily infected plants quickly."""
+        "about": "Distinct yellow mosaics and leaf distortion caused by CMGs. "
+                 "Major yield reducer in cassava, transmitted by whiteflies.",
+        "prevention": [
+            "Use virus-free planting material",
+            "Plant resistant varieties",
+            "Remove infected plants quickly",
+            "Manage whitefly vectors via IPM"
+        ]
+    },
+    "Cassava Brown Streak Disease": {
+        "agent": "Viruses (transmitted by Bemisia tabaci)",
+        "about": "Causes root necrosis and economic loss. Streaks on stems and chlorotic patches on leaves.",
+        "prevention": [
+            "Use certified clean planting material",
+            "Destroy infected plants",
+            "Control whitefly populations",
+            "Grow resistant varieties"
+        ]
+    },
+    "Cassava Bacterial Blight": {
+        "agent": "Xanthomonas spp.",
+        "about": "Angular water-soaked lesions, stem cankers, wilting and dieback after rains.",
+        "prevention": [
+            "Use clean planting cuttings",
+            "Remove and destroy infected plants",
+            "Disinfect tools",
+            "Plant tolerant varieties"
+        ]
+    },
+    "Cassava Green Mottle": {
+        "agent": "Cassava Green Mottle Virus",
+        "about": "Mottled yellow-green patches and leaf distortion. Plants become stunted with poor roots.",
+        "prevention": [
+            "Plant virus-free cuttings",
+            "Rogue and burn infected plants",
+            "Practice crop rotation and sanitation"
+        ]
     },
     "Healthy": {
         "agent": "None",
-        "about": """Uniform green leaves with no spots, streaks, distortion, or necrosis. Roots are firm and healthy.
-        **Practice:** Use clean cuttings, good field sanitation, balanced soil fertility, proper spacing, and routine scouting."""
+        "about": "Uniform green, symmetrical leaves without necrosis, streaks or distortion.",
+        "prevention": [
+            "Use disease-free cuttings",
+            "Maintain good field sanitation",
+            "Ensure balanced soil fertility",
+            "Scout fields regularly"
+        ]
     }
 }
 
 # Title
 st.title("🌿 Cassava Disease Predictor")
 
-# Layout
+# Create layout
 col1, col2 = st.columns([1, 1])
 
 with col1:
     st.markdown('<div class="custom-header">Upload Cassava Leaf Image</div>', unsafe_allow_html=True)
-    with st.container():
+    
+    upload_container = st.container()
+    with upload_container:
         st.markdown('<div class="upload-container">', unsafe_allow_html=True)
-        uploaded_file = st.file_uploader("Drag and drop file here",
-                                         type=["jpg", "jpeg", "png"],
-                                         accept_multiple_files=False,
-                                         label_visibility="collapsed")
+        uploaded_file = st.file_uploader(
+            "Drag and drop file here",
+            type=["jpg", "jpeg", "png"],
+            accept_multiple_files=False,
+            help="Limit 200MB per file - JPG, JPEG, PNG",
+            label_visibility="collapsed"
+        )
         st.markdown('</div>', unsafe_allow_html=True)
-
+    
     st.markdown('<div class="custom-header">Cassava Leaf Image</div>', unsafe_allow_html=True)
-    with st.container():
+    
+    image_container = st.container()
+    with image_container:
         st.markdown('<div class="image-container">', unsafe_allow_html=True)
         if uploaded_file:
             image = Image.open(uploaded_file)
+            import io
             buffered = io.BytesIO()
             image.save(buffered, format="PNG")
             img_str = base64.b64encode(buffered.getvalue()).decode()
-            st.markdown(f'<img src="data:image/png;base64,{img_str}" style="max-width:100%; height:auto;">',
-                        unsafe_allow_html=True)
+            st.markdown(f'<img src="data:image/png;base64,{img_str}" style="max-width:100%; height:auto;">', 
+                       unsafe_allow_html=True)
             st.markdown('<p style="margin-top:10px; color:#666;">Uploaded Cassava Leaf</p>', unsafe_allow_html=True)
         else:
-            st.markdown('<p style="color: grey; margin: 40px 0;">Image will appear here after upload</p>',
-                        unsafe_allow_html=True)
+            st.markdown('<p style="color: grey; margin: 40px 0;">Image will appear here after upload</p>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
 with col2:
     st.markdown('<div class="custom-header">Prediction Result</div>', unsafe_allow_html=True)
-    with st.container():
+    prediction_container = st.container()
+    with prediction_container:
         st.markdown('<div class="prediction-container">', unsafe_allow_html=True)
-
+        
         if uploaded_file:
-            if st.button("Predict", use_container_width=True):
-                # Simulate analysis
-                with st.spinner("🔄 Analyzing leaf image..."):
-                    analysis_time = random.randint(5, 15)
-                    time.sleep(analysis_time)
-
-                # Fake prediction (for demo)
-                predicted = "Cassava Mosaic Disease (CMD)"
-                confidence = random.randint(80, 97)
-
+            if st.button("Predict", type="primary", use_container_width=True):
+                with st.spinner("🔄 Analyzing..."):
+                    duration = random.randint(5, 15)  # vary between 5–15 sec
+                    progress_text = st.empty()
+                    progress_bar = st.progress(0)
+                    for i in range(100):
+                        time.sleep(duration / 100)
+                        progress_bar.progress(i + 1)
+                        progress_text.markdown('<div class="analyzing">Analyzing cassava leaf image...</div>', unsafe_allow_html=True)
+                
+                # Example fixed output (replace with model prediction)
+                predicted = "Cassava Mosaic Disease"
+                confidence = "92%"
+                data = disease_info[predicted]
+                
                 st.markdown(f'<div class="disease-name">{predicted}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="confidence">Confidence: {confidence}%</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="causative-agent">Causative agent: {disease_info[predicted]["agent"]}</div>',
-                            unsafe_allow_html=True)
-
-                st.markdown("**About the disease**")
-                st.write(disease_info[predicted]["about"])
-
+                st.markdown(f'<div class="causative">Causative agent: {data["agent"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="confidence">Confidence: {confidence}</div>', unsafe_allow_html=True)
+                
+                st.markdown("**About this disease**")
+                st.write(data["about"])
+                
+                st.markdown("**Prevention / Management**")
+                for tip in data["prevention"]:
+                    st.write(f"- {tip}")
         else:
-            st.markdown('<p style="color: grey; margin: 40px 0;">Prediction results will appear here after upload and analysis</p>',
-                        unsafe_allow_html=True)
+            st.markdown('<p style="color: grey; margin: 40px 0;">Results will appear here after prediction</p>', unsafe_allow_html=True)
+        
         st.markdown('</div>', unsafe_allow_html=True)
