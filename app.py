@@ -4,6 +4,7 @@ import numpy as np
 from PIL import Image
 import gdown
 import os
+import time
 
 # -------------------------------
 # Custom CSS for Professional Styling
@@ -51,6 +52,13 @@ st.markdown("""
         border-left: 5px solid #6a0dad;
         margin-top: 1rem;
     }
+    .disease-info {
+        background-color: #f0e6ff;
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        border-left: 5px solid #9370db;
+        margin-top: 1rem;
+    }
     .confidence-bar {
         background-color: #e6e6fa;
         height: 1.5rem;
@@ -76,6 +84,16 @@ st.markdown("""
         color: #6a0dad;
         font-size: 0.9rem;
     }
+    .consult-button {
+        background-color: #6a0dad;
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        text-decoration: none;
+        display: inline-block;
+        margin-top: 1rem;
+        font-weight: 600;
+    }
     /* Hide unnecessary Streamlit elements */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -88,7 +106,7 @@ st.markdown("""
 # -------------------------------
 
 MODEL_PATH = "cassava_model.keras"
-FILE_ID = "1BhoZx--RL8A6fgLbLG6uxOf7WR_VOjVq"  # ✅ Updated Google Drive file ID
+FILE_ID = "1Z_ALef3S-hYkyzqicsoRCYrv765d_tqq"  # Your Google Drive file ID
 
 @st.cache_resource
 def load_model():
@@ -135,7 +153,7 @@ def load_model():
 model = load_model()
 
 # -------------------------------
-# 2. Class Names
+# 2. Class Names and Disease Information
 # -------------------------------
 
 CLASS_NAMES = [
@@ -145,6 +163,35 @@ CLASS_NAMES = [
     "Cassava Mosaic Virus",
     "Healthy"
 ]
+
+# Disease information database
+DISEASE_INFO = {
+    "Cassava Bacterial Blight": {
+        "symptoms": "Water-soaked angular leaf spots, blight, wilting, stem cankers, and dieback. Leaves may show yellowing and necrosis.",
+        "prevention": "Use disease-free planting materials, practice crop rotation, avoid waterlogged conditions, and remove infected plants.",
+        "consult_link": "tel:+1234567890"
+    },
+    "Cassava Brown Streak Disease": {
+        "symptoms": "Yellow chlorotic patterns along veins, brown necrotic streaks on stems, root constriction, and rot.",
+        "prevention": "Plant resistant varieties, control whitefly vectors, use clean planting materials, and rogue infected plants.",
+        "consult_link": "tel:+1234567890"
+    },
+    "Cassava Green Mottle": {
+        "symptoms": "Light and dark green mosaic patterns on leaves, leaf distortion, stunting, and reduced root yield.",
+        "prevention": "Use virus-free planting materials, control insect vectors, practice field sanitation, and remove weeds.",
+        "consult_link": "tel:+1234567890"
+    },
+    "Cassava Mosaic Virus": {
+        "symptoms": "Leaf mosaic patterns, leaf distortion, reduced leaf size, stunted growth, and tuber yield reduction.",
+        "prevention": "Plant resistant varieties, use virus-free cuttings, control whitefly populations, and practice rogueing.",
+        "consult_link": "tel:+1234567890"
+    },
+    "Healthy": {
+        "symptoms": "No visible signs of disease. Leaves are uniformly green with normal shape and size.",
+        "prevention": "Maintain good agricultural practices, monitor regularly for early signs of disease, and ensure proper nutrition.",
+        "consult_link": "tel:+1234567890"
+    }
+}
 
 # -------------------------------
 # 3. Enhanced Streamlit Interface
@@ -198,7 +245,16 @@ else:
             st.image(image, caption="Uploaded Cassava Leaf", use_container_width=True)
             
             if st.button("🔍 Analyze Image", use_container_width=True, type="primary"):
-                with st.spinner("Analyzing image with AI..."):
+                # Create a progress bar for the 15-second analysis
+                progress_text = "Analysis in progress. Please wait..."
+                progress_bar = st.progress(0, text=progress_text)
+                
+                for percent_complete in range(100):
+                    time.sleep(0.15)  # 15 seconds total for the progress bar
+                    progress_bar.progress(percent_complete + 1, text=progress_text)
+                
+                # Actual prediction (this happens quickly but we've already shown the progress)
+                with st.spinner("Finalizing analysis..."):
                     # Preprocess image
                     img = image.resize((224, 224))
                     img_array = np.expand_dims(np.array(img) / 255.0, axis=0)
@@ -217,9 +273,13 @@ else:
                         }
                     except Exception as e:
                         st.error(f"Error during prediction: {str(e)}")
+                
+                progress_bar.empty()
+                st.success("Analysis complete!")
     
-    with col2:
-        if uploaded_file and "prediction" in st.session_state:
+    # Show results in the left column if available
+    if uploaded_file and "prediction" in st.session_state:
+        with col1:
             pred = st.session_state.prediction
             
             st.markdown("### 📊 Analysis Results")
@@ -248,24 +308,42 @@ else:
                 )
             
             st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Show disease information in the right column if prediction is available
+    if uploaded_file and "prediction" in st.session_state:
+        with col2:
+            pred = st.session_state.prediction
+            disease_name = pred["class"]
+            disease_data = DISEASE_INFO[disease_name]
             
-            # Recommendations based on prediction
-            st.markdown("#### 💡 Recommendations")
-            if pred["class"] == "Healthy":
-                st.info("""
-                - Continue current farming practices
-                - Monitor plants regularly for early detection
-                - Maintain proper spacing and nutrition
-                """)
+            st.markdown("### 🌱 Disease Information")
+            st.markdown(f'#### {disease_name}')
+            
+            # Disease info card
+            st.markdown('<div class="disease-info">', unsafe_allow_html=True)
+            
+            st.markdown("**Symptoms:**")
+            st.info(disease_data["symptoms"])
+            
+            st.markdown("**Prevention Measures:**")
+            st.success(disease_data["prevention"])
+            
+            st.markdown("**Recommendation:**")
+            if disease_name == "Healthy":
+                st.markdown("Your plant appears healthy. Continue monitoring and maintain good agricultural practices.")
             else:
-                st.warning("""
-                - Isolate affected plants if possible
-                - Consult with agricultural experts
-                - Consider appropriate treatment options
-                - Monitor nearby plants for spread
-                """)
-        else:
-            st.info("👈 Upload an image and click 'Analyze' to get results")
+                st.markdown("We recommend consulting with an agricultural expert for specific treatment options.")
+            
+            # Consult button
+            st.markdown(
+                f'<a href="{disease_data["consult_link"]}" class="consult-button">📞 Consult an Expert</a>',
+                unsafe_allow_html=True
+            )
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+    elif uploaded_file:
+        with col2:
+            st.info("👈 Click 'Analyze Image' to get detailed disease information")
             
     # Add some information about the system
     st.markdown("---")
@@ -293,4 +371,4 @@ else:
 
 # Footer
 st.markdown("---")
-st.markdown('<div class="footer">AgriNova.ai • AI-Powered Agricultural Solutions • © 2025</div>', unsafe_allow_html=True)
+st.markdown('<div class="footer">AgriNova.ai • AI-Powered Agricultural Solutions • © 2023</div>', unsafe_allow_html=True)
