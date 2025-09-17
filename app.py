@@ -1,112 +1,127 @@
 import streamlit as st
+import tensorflow as tf
+import numpy as np
 from PIL import Image
-import base64
+import gdown
+import os
 import time
 import random
 
-# Page config
-st.set_page_config(page_title="Cassava Disease Predictor", layout="centered")
-
-# Custom CSS for permanent layout with better image containment
+# -------------------------------
+# Custom CSS for Professional Styling
+# -------------------------------
 st.markdown("""
-    <style>
-        .main {
-            background-color: #fafafa;
-        }
-        .stButton>button {
-            background-color: #6a0dad;
-            color: white;
-            border-radius: 8px;
-            height: 3em;
-            width: 100%;
-            font-size: 16px;
-        }
-        .stButton>button:hover {
-            background-color: #580a9e;
-        }
-        .prediction-container {
-            background-color: #f0f0f0;
-            padding: 20px;
-            border-radius: 10px;
-            margin-top: 20px;
-            min-height: 350px;
-            overflow: hidden;
-        }
-        .upload-container {
-            background-color: #f8f8f8;
-            padding: 20px;
-            border-radius: 10px;
-            border: 2px dashed #6a0dad;
-            margin-bottom: 20px;
-            min-height: 200px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-        .image-container {
-            background-color: white;
-            padding: 15px;
-            border-radius: 10px;
-            border: 1px solid #ddd;
-            margin: 20px 0;
-            text-align: center;
-            min-height: 250px;
-            overflow: hidden;
-        }
-        .image-container img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 5px;
-        }
-        .disease-name {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #6a0dad;
-            margin-bottom: 5px;
-        }
-        .causative {
-            font-size: 1rem;
-            font-style: italic;
-            color: #444;
-            margin-bottom: 10px;
-        }
-        .confidence {
-            font-size: 1.2rem;
-            font-weight: bold;
-            margin-bottom: 15px;
-            color: #2c662d;
-        }
-        .custom-header {
-            color: #6a0dad;
-            border-bottom: 2px solid #6a0dad;
-            padding-bottom: 10px;
-            margin-bottom: 15px;
-        }
-        .analyzing {
-            text-align: center;
-            font-size: 1.1rem;
-            color: #6a0dad;
-            margin-bottom: 10px;
-        }
-    </style>
+<style>
+    .main-header {
+        font-size: 3rem;
+        color: #6a0dad;
+        font-weight: 700;
+        margin-bottom: 0;
+    }
+    .sub-header {
+        font-size: 1.5rem;
+        color: #8a2be2;
+        font-weight: 400;
+        margin-top: 0;
+    }
+    .agrinova-badge {
+        background-color: #6a0dad;
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        display: inline-block;
+    }
+    .stButton>button {
+        background-color: #6a0dad;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+    }
+    .stButton>button:hover {
+        background-color: #8a2be2;
+        color: white;
+    }
+    .prediction-card {
+        background-color: #f8f5ff;
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        border-left: 5px solid #6a0dad;
+        margin-top: 1rem;
+    }
+    .footer {
+        text-align: center;
+        margin-top: 3rem;
+        color: #6a0dad;
+        font-size: 0.9rem;
+    }
+    .analyzing {
+        text-align: center;
+        font-size: 1.1rem;
+        color: #6a0dad;
+        margin-bottom: 10px;
+    }
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+</style>
 """, unsafe_allow_html=True)
 
-# Disease info dictionary
-disease_info = {
-    "Cassava Mosaic Disease": {
-        "agent": "Cassava Mosaic Geminiviruses (CMGs)",
-        "about": "Distinct yellow mosaics and leaf distortion caused by CMGs. "
-                 "Major yield reducer in cassava, transmitted by whiteflies.",
+# -------------------------------
+# 1. Load Model
+# -------------------------------
+MODEL_PATH = "cassava_model.keras"
+FILE_ID = "1BhoZx--RL8A6fgLbLG6uxOf7WR_VOjVq"  
+
+@st.cache_resource
+def load_model():
+    if os.path.exists(MODEL_PATH):
+        try:
+            return tf.keras.models.load_model(MODEL_PATH)
+        except:
+            os.remove(MODEL_PATH)
+    
+    try:
+        with st.spinner("Downloading model from Google Drive..."):
+            url = f"https://drive.google.com/uc?id={FILE_ID}"
+            gdown.download(url, MODEL_PATH, quiet=False)
+        return tf.keras.models.load_model(MODEL_PATH)
+    except Exception as e:
+        st.error(f"Error downloading/loading model: {str(e)}")
+        if os.path.exists(MODEL_PATH):
+            os.remove(MODEL_PATH)
+        return None
+
+model = load_model()
+
+# -------------------------------
+# 2. Class Names + Disease Info
+# -------------------------------
+CLASS_NAMES = [
+    "Cassava Bacterial Blight",
+    "Cassava Brown Streak Disease",
+    "Cassava Green Mottle",
+    "Cassava Mosaic Virus",
+    "Healthy"
+]
+
+DISEASE_INFO = {
+    "Cassava Bacterial Blight": {
+        "agent": "Xanthomonas spp.",
+        "about": "Water-soaked angular lesions, stem cankers, wilting and dieback after rains.",
         "prevention": [
-            "Use virus-free planting material",
-            "Plant resistant varieties",
-            "Remove infected plants quickly",
-            "Manage whitefly vectors via IPM"
+            "Use clean planting cuttings",
+            "Remove and destroy infected plants",
+            "Disinfect tools between use",
+            "Plant tolerant/resistant varieties"
         ]
     },
     "Cassava Brown Streak Disease": {
         "agent": "Viruses (transmitted by Bemisia tabaci)",
-        "about": "Causes root necrosis and economic loss. Streaks on stems and chlorotic patches on leaves.",
+        "about": "Yellow patches, brown streaks on stems, root necrosis causing yield loss.",
         "prevention": [
             "Use certified clean planting material",
             "Destroy infected plants",
@@ -114,109 +129,120 @@ disease_info = {
             "Grow resistant varieties"
         ]
     },
-    "Cassava Bacterial Blight": {
-        "agent": "Xanthomonas spp.",
-        "about": "Angular water-soaked lesions, stem cankers, wilting and dieback after rains.",
+    "Cassava Green Mottle": {
+        "agent": "Cassava green mottle virus",
+        "about": "Leaves show mottled yellow-green patches and distortion; plants become stunted.",
         "prevention": [
-            "Use clean planting cuttings",
-            "Remove and destroy infected plants",
-            "Disinfect tools",
-            "Plant tolerant varieties"
+            "Use virus-free planting material",
+            "Rogue and destroy infected plants",
+            "Maintain field sanitation and crop rotation"
         ]
     },
-    "Cassava Green Mottle": {
-        "agent": "Cassava Green Mottle Virus",
-        "about": "Mottled yellow-green patches and leaf distortion. Plants become stunted with poor roots.",
+    "Cassava Mosaic Virus": {
+        "agent": "Cassava Mosaic Geminiviruses (CMGs)",
+        "about": "Distinct yellow-green mosaics, leaf distortion, reduced yield. Spread by whiteflies.",
         "prevention": [
-            "Plant virus-free cuttings",
-            "Rogue and burn infected plants",
-            "Practice crop rotation and sanitation"
+            "Use virus-free planting cuttings",
+            "Plant resistant/tolerant varieties",
+            "Remove infected plants quickly",
+            "Manage whitefly vectors (IPM)"
         ]
     },
     "Healthy": {
         "agent": "None",
-        "about": "Uniform green, symmetrical leaves without necrosis, streaks or distortion.",
+        "about": "Uniform green, symmetrical leaves without lesions, streaks or distortion.",
         "prevention": [
-            "Use disease-free cuttings",
-            "Maintain good field sanitation",
-            "Ensure balanced soil fertility",
-            "Scout fields regularly"
+            "Continue current practices",
+            "Scout fields regularly",
+            "Maintain soil fertility and sanitation"
         ]
     }
 }
 
-# Title
-st.title("🌿 Cassava Disease Predictor")
+# -------------------------------
+# 3. Streamlit Interface
+# -------------------------------
+st.set_page_config(
+    page_title="AgriNova.ai - Cassava Disease Detection",
+    page_icon="🌿",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# Create layout
-col1, col2 = st.columns([1, 1])
-
+col1, col2 = st.columns([3, 1])
 with col1:
-    st.markdown('<div class="custom-header">Upload Cassava Leaf Image</div>', unsafe_allow_html=True)
-    
-    upload_container = st.container()
-    with upload_container:
-        st.markdown('<div class="upload-container">', unsafe_allow_html=True)
-        uploaded_file = st.file_uploader(
-            "Drag and drop file here",
-            type=["jpg", "jpeg", "png"],
-            accept_multiple_files=False,
-            help="Limit 200MB per file - JPG, JPEG, PNG",
-            label_visibility="collapsed"
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    st.markdown('<div class="custom-header">Cassava Leaf Image</div>', unsafe_allow_html=True)
-    
-    image_container = st.container()
-    with image_container:
-        st.markdown('<div class="image-container">', unsafe_allow_html=True)
-        if uploaded_file:
-            image = Image.open(uploaded_file)
-            import io
-            buffered = io.BytesIO()
-            image.save(buffered, format="PNG")
-            img_str = base64.b64encode(buffered.getvalue()).decode()
-            st.markdown(f'<img src="data:image/png;base64,{img_str}" style="max-width:100%; height:auto;">', 
-                       unsafe_allow_html=True)
-            st.markdown('<p style="margin-top:10px; color:#666;">Uploaded Cassava Leaf</p>', unsafe_allow_html=True)
-        else:
-            st.markdown('<p style="color: grey; margin: 40px 0;">Image will appear here after upload</p>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
+    st.markdown('<h1 class="main-header">AgriNova.ai</h1>', unsafe_allow_html=True)
+    st.markdown('<h2 class="sub-header">Intelligent Crop Disease Detection</h2>', unsafe_allow_html=True)
 with col2:
-    st.markdown('<div class="custom-header">Prediction Result</div>', unsafe_allow_html=True)
-    prediction_container = st.container()
-    with prediction_container:
-        st.markdown('<div class="prediction-container">', unsafe_allow_html=True)
-        
+    st.markdown('<div class="agrinova-badge">Cassava Disease Classifier</div>', unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+if model is None:
+    st.error("Model loading failed. Please try again.")
+else:
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        st.markdown("### 📤 Upload Cassava Leaf Image")
+        uploaded_file = st.file_uploader(
+            "Choose an image file", type=["jpg", "jpeg", "png"], label_visibility="collapsed"
+        )
         if uploaded_file:
-            if st.button("Predict", type="primary", use_container_width=True):
+            image = Image.open(uploaded_file).convert("RGB")
+            st.image(image, caption="Uploaded Cassava Leaf", use_container_width=True)
+
+            if st.button("🔍 Analyze Image", use_container_width=True, type="primary"):
                 with st.spinner("🔄 Analyzing..."):
-                    duration = random.randint(5, 15)  # vary between 5–15 sec
-                    progress_text = st.empty()
+                    duration = random.randint(5, 15)
                     progress_bar = st.progress(0)
+                    status_text = st.empty()
                     for i in range(100):
                         time.sleep(duration / 100)
                         progress_bar.progress(i + 1)
-                        progress_text.markdown('<div class="analyzing">Analyzing cassava leaf image...</div>', unsafe_allow_html=True)
-                
-                # Example fixed output (replace with model prediction)
-                predicted = "Cassava Mosaic Disease"
-                confidence = "92%"
-                data = disease_info[predicted]
-                
-                st.markdown(f'<div class="disease-name">{predicted}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="causative">Causative agent: {data["agent"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="confidence">Confidence: {confidence}</div>', unsafe_allow_html=True)
-                
-                st.markdown("**About this disease**")
-                st.write(data["about"])
-                
-                st.markdown("**Prevention / Management**")
-                for tip in data["prevention"]:
-                    st.write(f"- {tip}")
+                        status_text.markdown('<div class="analyzing">Analyzing cassava leaf image...</div>', unsafe_allow_html=True)
+
+                    try:
+                        img = image.resize((224, 224))
+                        img_array = np.expand_dims(np.array(img) / 255.0, axis=0)
+                        preds = model.predict(img_array)
+                        confidence = np.max(preds) * 100
+                        predicted_class = CLASS_NAMES[np.argmax(preds)]
+                        st.session_state.prediction = {
+                            "class": predicted_class,
+                            "confidence": confidence,
+                        }
+                    except Exception as e:
+                        st.error(f"Error during prediction: {str(e)}")
+
+    with col2:
+        if uploaded_file and "prediction" in st.session_state:
+            pred = st.session_state.prediction
+            st.markdown("### 📊 Analysis Results")
+            st.markdown('<div class="prediction-card">', unsafe_allow_html=True)
+
+            if pred["class"] == "Healthy":
+                st.success(f"**Status:** {pred['class']} 🟢")
+            else:
+                st.error(f"**Status:** {pred['class']} 🔴")
+
+            # ✅ Show only one confidence score
+            st.metric("Confidence Level", f"{pred['confidence']:.2f}%")
+
+            # ✅ Show causative agent
+            st.markdown(f"**Causative Agent:** {DISEASE_INFO[pred['class']]['agent']}")
+
+            # ✅ Disease description
+            st.markdown("**About this disease**")
+            st.write(DISEASE_INFO[pred['class']]['about'])
+
+            st.markdown("**Prevention / Management**")
+            for tip in DISEASE_INFO[pred['class']]['prevention']:
+                st.write(f"- {tip}")
+
+            st.markdown('</div>', unsafe_allow_html=True)
         else:
-            st.markdown('<p style="color: grey; margin: 40px 0;">Results will appear here after prediction</p>', unsafe_allow_html=True)
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+            st.info("👈 Upload an image and click 'Analyze' to get results")
+
+# Footer
+st.markdown("---")
+st.markdown('<div class="footer">AgriNova.ai • AI-Powered Agricultural Solutions • © 2025</div>', unsafe_allow_html=True)
